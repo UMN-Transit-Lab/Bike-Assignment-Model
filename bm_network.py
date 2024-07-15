@@ -56,7 +56,7 @@ class Zone:
                 tmpMinLabelNode = tmpNode
         if tmpMinLabel == 999999:
             from random import choice
-            print ('X')
+            #print ('X')
             return choice(self.zoneNodes)
         else:
             return tmpMinLabelNode
@@ -68,10 +68,13 @@ class Zone:
                 tmpMinLabelNode = tmpNode
         if tmpMinLabel == 999999:
             from random import choice
-            print ('X')
+            #print ('X')
             return choice(self.zoneNodes)
         else:
             return tmpMinLabelNode
+    def resetDemand(self):
+        self.zoneProduction = {}
+        self.zoneAttraction = {}
     def addTripProduction(self, _toZone, _production):
         if _toZone in self.zoneProduction:
             self.zoneProduction[_toZone] = self.zoneProduction[_toZone] + float(_production)
@@ -129,9 +132,9 @@ class Node:
         Node.nodeCount = Node.nodeCount + 1
         self.nodeId = _nodeId
         self.nodeName = _name
-        self.nodeType = _type
-        self.nodeLon = float(_lon)  ## (2*float(_lon)-900)
-        self.nodeLat = float(_lat)   ## (900.0 - float(_lat))
+        self.nodeType = _type  ## this should represent the intersection type (major, minor, no, etc.)
+        self.nodeLon = float(_lon)/1000000.0  ## (2*float(_lon)-900)
+        self.nodeLat = float(_lat)/1000000.0   ## (900.0 - float(_lat))
         self.inLinks = []
         self.outLinks = []
         self.permanent = False
@@ -318,6 +321,14 @@ class Node:
         for i in range(len(self.nodeSuccessor)):
             if tmpRand <= tmpAltProb[i]:
                 return [self.nodeSuccessor[i], self.nodeBackwardLink[i]]
+    def printForwardShortestpathLabels(self):
+        print ("ID:",self.nodeId, "Inbound:", self.inLinks, " Outbound:", self.outLinks,
+               "ArrivalTime:", self.nodeArrivalTime, "Predecessor:", self.nodePredecessor, 
+               "ForwardLink:", self.nodeForwardLink, "ForwardLabel:", self.nodeForwardLabel)  
+
+    def printForwardHyperpathLabels(self):
+        print ("ID:",self.nodeId, "Inbound:", #self.inLinks, " Outbound:", self.outLinks,
+               "ForwardLabel:", self.nodeForwardLabel)  
 
 ################################################## Link Class ##################################################
 class Link:
@@ -325,18 +336,28 @@ class Link:
     linkCount = 0
 
     'functions'
-    def __init__(self, _token):
+    def __init__(self, _token, _rev):
         self.linkId = _token[0]
         self.linkName = _token[1]
         self.linkFromNode = _token[2]
         self.linkToNode = _token[3]
+        if _rev == 'reverse1':
+            self.linkFromNode = _token[3]
+            self.linkToNode = _token[2]
+        if _rev == 'reverse2':
+            self.linkId = _token[0] + '.1'
+            self.linkFromNode = _token[3]
+            self.linkToNode = _token[2]
         self.linkType = _token[4]
+        self.linkDirection = float(_token[5])
         self.linkLength = float(_token[6])
-        self.speedLimit = float(_token[7])
-        self.freeFlowTime = float(_token[8])
-        self.capacity = float(_token[9])
-        self.alpha = float(_token[10])
-        self.beta = float(_token[11])
+        self.pathType = _token[7]
+        self.surface = _token[8]
+        self.speedLimit = float(_token[9])
+        self.freeFlowTime = float(_token[10])
+#        self.capacity = float(_token[9])
+#        self.alpha = float(_token[10])
+#        self.beta = float(_token[11])
         self.X1 = nodeSet[self.linkFromNode].getCoordinates()[0]
         self.Y1 = nodeSet[self.linkFromNode].getCoordinates()[1]
         self.X2 = nodeSet[self.linkToNode].getCoordinates()[0]
@@ -346,6 +367,23 @@ class Link:
         self.auxiliaryFlow = 0
         self.travelTime = self.freeFlowTime
         Link.linkCount = Link.linkCount + 1
+    def calculateSpeedAndTime(self):
+        self.speed = 9.24 ## constant obtained from regression modeling and fixing some variables 
+        self.speed += 0.23*self.linkLength ## speed increase for longer links
+        if self.pathType in ['Bike Lane', 'Multi-Use Path -']: ## assuming off-street, so adding full speed increase 
+            self.speed += 0.94 
+        elif self.pathType in ['Bike Route', 'Paved Shoulder']:  ## assuming semi-off-street, so adding half speed increase 
+            self.speed += (0.94 / 2.0)
+        else:  ##assuming on-street and deducting the full speed decrease
+            self.speed -= 0.32
+        ## calculate travel time and add the effect of signalized intersection:
+        self.freeFlowTime = self.linkLength / self.speed * 60
+        if nodeSet[self.linkToNode].nodeType == 3:
+            self.freeFlowTime -= 1.0
+        elif nodeSet[self.linkToNode].nodeType == 2:
+            self.freeFlowTime -= 0.5
+        self.travelTime = self.freeFlowTime
+        
     def resetLabels(self):
         self.alreadyUsed = False
     def getFromNode(self):
@@ -358,12 +396,14 @@ class Link:
         return self.capacity
     def getCost(self, _utility):
         tmpCost = self.linkLength*_utility[2]
+        '''
         if self.linkType==1:
             tmpCost = tmpCost*_utility[3]
         elif self.linkType==2:
             tmpCost = tmpCost*_utility[4]
         elif self.linkType==2:
             tmpCost = tmpCost*_utility[5]
+        '''
         return tmpCost
     def exclude(self):
         self.alreadyUsed = True
@@ -398,12 +438,12 @@ class Link:
 ################################################## Reading Input Data ##################################################
 def readNodes(_networkName):
     ''' Reads nodes from a text (.dat) file and creates Node objects '''
-    inFile = open(_networkName+"input_nodes.dat", "r")
+    inFile = open(_networkName+"input_nodes.csv", "r")
     tmpIn = inFile.readline()
     while (1):
         tmpIn = inFile.readline()
         if tmpIn == "": break
-        token = tmpIn.split()
+        token = tmpIn.split(',')
         tmpNodeId = token[0]
         #nodeList.append(tmpNodeId)
         ''' Here it creates a Node object and adds it to the set NodeSet '''
@@ -413,42 +453,47 @@ def readNodes(_networkName):
 
 def readLinks(_networkName):
     ''' Reads links from a text (.dat) file and creates Link objects '''
-    inFile = open(_networkName+"input_links.dat", "r")
+    inFile = open(_networkName+"input_links.csv", "r")
     tmpIn = inFile.readline()
     while (1):
         tmpIn = inFile.readline()
         if tmpIn == "": break
-        token = tmpIn.split()
+        token = tmpIn.split(',')
         tmpLinkId = token[0]
         tmpDir = int(token[5])
         if(tmpDir==1):
             ''' Seems like TransCAD direction ID, ''forward'', create a forward link '''
-            linkSet[tmpLinkId] = Link(token)
+            linkSet[tmpLinkId] = Link(token, '')
             tmpFromNode = token[2]
             tmpToNode = token[3]
             nodeSet[tmpFromNode].attachLink(tmpLinkId, "out")
             nodeSet[tmpToNode].attachLink(tmpLinkId, "in")
         elif(tmpDir==-1):
             ''' Seems like TransCAD direction ID, ''reverse'', create an opposite direction link  '''
-            linkSet[tmpLinkId] = Link(token)
+            linkSet[tmpLinkId] = Link(token, 'reverse1')
             tmpFromNode = token[3]
             tmpToNode = token[2]
             nodeSet[tmpFromNode].attachLink(tmpLinkId, "out")
             nodeSet[tmpToNode].attachLink(tmpLinkId, "in")
         else:
             ''' Seems like TransCAD direction ID, ''bidirectional'', careate two links in forward and opposite direction  '''
-            linkSet[tmpLinkId] = Link(token)
+            linkSet[tmpLinkId] = Link(token, '')
             tmpFromNode = token[2]
             tmpToNode = token[3]
             nodeSet[tmpFromNode].attachLink(tmpLinkId, "out")
             nodeSet[tmpToNode].attachLink(tmpLinkId, "in")
-            linkSet[tmpLinkId+'.1'] = Link(token)
+            #create the reverse link too
+            linkSet[tmpLinkId+'.1'] = Link(token, 'reverse2')
             tmpFromNode = token[3]
             tmpToNode = token[2]
             nodeSet[tmpFromNode].attachLink(tmpLinkId+'.1', "out")
             nodeSet[tmpToNode].attachLink(tmpLinkId+'.1', "in")
     inFile.close()
     return len(linkSet) #Link.linkCount
+
+def calculateLinkSpeeds():
+    for tmpLinkId in linkSet.keys():
+        linkSet[tmpLinkId].calculateSpeedAndTime()
 
 def refineNodes():
     ''' Checks for nodes that are NOT CONNECTED to any links and removes them '''
@@ -466,13 +511,13 @@ def refineNodes():
 
 def readZones(_networkName):
     ''' Reads zones (connedtors?) from a text (.dat) file and creates Zone objects '''
-    inFile = open(_networkName+"input_zones.dat", "r")
+    inFile = open(_networkName+"input_zones.csv", "r")
     tmpIn = inFile.readline()
     #i = 1
     while (1):
         tmpIn = inFile.readline()
         if tmpIn == "": break
-        token = tmpIn.split()
+        token = tmpIn.split(',')
         tmpZoneId = token[0]
         tmpNodeId = token[1]
         tmpTranscadId = token[2]

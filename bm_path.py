@@ -56,26 +56,28 @@ class PathAlgorithm:
         while len(SE)!=0:
             tmpIter = tmpIter + 1
             tmpTuple = heapq.heappop(SE)
-            currentNode = tmpTuple[1]                                                                                   #;print currentNode
+            currentNode = tmpTuple[1]
             currentTime = bm_network.nodeSet[currentNode].getForwardTime()
             currentLabel = bm_network.nodeSet[currentNode].getForwardLabel()
             #if _skim==1 and currentTime >= 600: continue
-            tmpLinkList = bm_network.nodeSet[currentNode].getOutboundLinks()                                            #;print tmpLinkList
+            tmpLinkList = bm_network.nodeSet[currentNode].getOutboundLinks()
             for adjLink in tmpLinkList:
-                newNode = bm_network.linkSet[adjLink].getToNode()                                                       #;print "toNode:", newNode
+                newNode = bm_network.linkSet[adjLink].getToNode()
                 oldTime = bm_network.nodeSet[newNode].getForwardTime()
-                oldLabel = bm_network.nodeSet[newNode].getForwardLabel()                                                #;print "oldLabel:", oldLabel
-                newTime = currentTime + bm_network.linkSet[adjLink].getTravelTime() ## getCost(self.utilityParameters)                                         #;print "newLabel:", newLabel
-                newLabel = currentLabel + bm_network.linkSet[adjLink].getTravelTime() ### getCost(self.utilityParameters)                                       #;print "newLabel:", newLabel
+                oldLabel = bm_network.nodeSet[newNode].getForwardLabel()
+                newTime = currentTime + bm_network.linkSet[adjLink].getTravelTime()
+                newLabel = currentLabel + bm_network.linkSet[adjLink].getCost(self.utilityParameters)
                 if newLabel < oldLabel:
                     bm_network.nodeSet[newNode].setForwardLabel(newLabel, newTime, currentNode, adjLink)
                     heapq.heappush(SE, (bm_network.nodeSet[newNode].getForwardLabel(), newNode))
         return tmpIter
     def getForwardShortestPath(self, _origin, _destination):
+        '''use this line only if the destination is a node and not a zone'''
+        ## shortestPathNodes = [_destination]
+        #currentNode = bm_network.zoneSet[_destination].getRandomNode()
+        currentNode = bm_network.zoneSet[_destination].getMinForwardLabelNode()                       
+        shortestPathNodes = [currentNode]
         shortestPathLinks = []
-        shortestPathNodes = [_destination]
-        currentNode = bm_network.zoneSet[_destination].getRandomNode()
-        #currentNode = bm_network.zoneSet[_destination].getMinForwardLabelNode()                       #;print currentNode
         while currentNode!=_origin:
             newLink = bm_network.nodeSet[currentNode].getForwardLink()
             if newLink=='':
@@ -102,8 +104,8 @@ class PathAlgorithm:
         for link in bm_network.linkSet:
             bm_network.linkSet[link].resetLabels()
         SE = []
-        tmpDestNodes = bm_network.zoneSet[_origin].getNodes()                                                           #;print tmpDestNodes
-        for tmpNode in tmpDestNodes:
+        tmpOrigNodes = bm_network.zoneSet[_origin].getNodes()                                                           #;print tmpDestNodes
+        for tmpNode in tmpOrigNodes:
             bm_network.nodeSet[tmpNode].setForwardHyperLabel(0,0,0,"","")
             heapq.heappush(SE, (bm_network.nodeSet[tmpNode].getForwardLabel(), tmpNode))
         tmpIter = 0
@@ -148,11 +150,12 @@ class PathAlgorithm:
         diffUtility = (-1/theta)*math.log((1-minProb)/minProb)
         elementaryPathLinks = []
         elementaryPathNodes = [_destination]
-        currentNode = bm_network.zoneSet[_destination].getRandomNode()
+        #currentNode = bm_network.zoneSet[_destination].getRandomNode()
+        currentNode = bm_network.zoneSet[_destination].getMinForwardLabelNode()
         prevNode = ""
         while currentNode!="":
             j=0
-            while j<100:
+            while j<10:
                 newAlt = bm_network.nodeSet[currentNode].getForwardAlternative(theta, minProb)                            #;print newAlt
                 if newAlt != None:
                     if newAlt[1] == "":
@@ -162,10 +165,12 @@ class PathAlgorithm:
                         #time.sleep(1)
                         #if newAlt[0]!=prevNode:
                         if newAlt[0] not in elementaryPathNodes:
+                            ''' This means that a next node it found that is not already in the path (i.e., it doesn't create a loop).
+                            Therefore, exit the while loop and proceed. '''
                             break
                         else:
+                            ''' The node already in the path, so creates a loop. Void it and go to next j to select another node probabilisitically.'''
                             newAlt = None
-
                 j=j+1
 
             if newAlt==None:
@@ -184,8 +189,8 @@ class PathAlgorithm:
             else:
                 prevNode = currentNode
                 currentNode = newNode
-#        return elementaryPath[1:]
-        return [elementaryPathNodes, elementaryPathLinks]
+#        return [elementaryPathNodes, elementaryPathLinks]    ### This is the complete one before using Zones in MAG 2024 work
+        return [elementaryPathNodes[1:], elementaryPathLinks[1:]]
     
 ################################################## Other Path Functions ##################################################
     def getPathCost(self, _path):
@@ -210,156 +215,3 @@ class PathAlgorithm:
             tmpFlow = tmpPathSet[tmpPath][2]
             for tmpLink in tmpPath.split(','):
                 bm_network.linkSet[tmpLink].addFlow(tmpFlow)
-
-################################################## Inactive Functions ##################################################             
-    '''def getForwardShortestPathTree(self):
-        shortestPathTree = ''
-        for tmpNode in bm_network.nodeSet:
-            tmpLink = bm_network.nodeSet[tmpNode].getForwardLink()
-            if tmpLink==[]:     continue
-            if shortestPathTree=='':
-                shortestPathTree = tmpLink
-            else:
-                shortestPathTree = shortestPathTree + ',' + tmpLink
-        return shortestPathTree'''
-    '''def getForwardShortestPathNodes(self, _origin, _destination):
-        shortestPathNodes = _destination
-        currentNode = _destination
-        while currentNode!=_origin:
-            newNode = bm_network.nodeSet[currentNode].getPredecessor()
-            shortestPathNodes = newNode + "," + shortestPathNodes
-            currentNode = newNode
-        return shortestPathNodes'''
-####
-    '''def findBackwardShortestPath(self, _destination):
-        for node in bm_network.nodeSet:
-            bm_network.nodeSet[node].resetLabels()
-        SE = []
-        #tmpNode = bm_network.zoneSet[_destination].getRandomNode()                             #;print tmpOrigNodes
-        #bm_network.nodeSet[tmpNode].setBackwardLabel(0,0,"","")
-        #heapq.heappush(SE, (bm_network.nodeSet[tmpNode].getBackwardLabel(), tmpNode))
-        tmpDestNodes = bm_network.zoneSet[_destination].getNodes()                                                      #;print tmpDestNodes
-        for tmpNode in tmpDestNodes:
-            bm_network.nodeSet[tmpNode].setBackwardLabel(0,0,"","")
-            heapq.heappush(SE, (bm_network.nodeSet[tmpNode].getBackwardLabel(), tmpNode))
-        tmpIter = 0
-        while len(SE)!=0:
-            tmpIter = tmpIter + 1
-            tmpTuple = heapq.heappop(SE)                                                                                #;print tmpTuple
-            currentNode = tmpTuple[1]                                                                                   #;print currentNode
-            currentLabel = bm_network.nodeSet[currentNode].getBackwardLabel()
-            if currentLabel >= 300: continue
-            tmpLinkList = bm_network.nodeSet[currentNode].getInboundLinks()                                            #;print tmpLinkList
-            for adjLink in tmpLinkList:
-                newNode = bm_network.linkSet[adjLink].getFromNode()                                                    #;print "fromNode:", newNode
-                oldLabel = bm_network.nodeSet[newNode].getBackwardLabel()                                              #;print "oldLabel:", oldLabel
-                #newLabel = currentLabel + bm_network.linkSet[adjLink].getLength()                                      #;print "newLabel:", newLabel
-                newLabel = currentLabel + bm_network.linkSet[adjLink].getCost(self.utilityParameters)                                      #;print "newLabel:", newLabel
-                if newLabel < oldLabel:
-                    bm_network.nodeSet[newNode].setBackwardLabel(newLabel, newLabel, currentNode, adjLink)
-                    heapq.heappush(SE, (bm_network.nodeSet[newNode].getBackwardLabel(), newNode))
-        return tmpIter'''
-    '''def getBackwardShortestPathTree(self):
-        shortestPathTree = ''
-        for tmpNode in bm_network.nodeSet:
-            tmpLink = bm_network.nodeSet[tmpNode].getBackwardLink()
-            if tmpLink==[]: continue
-            if shortestPathTree=='':
-                shortestPathTree = tmpLink
-            else:
-                shortestPathTree = shortestPathTree + ',' + tmpLink
-        return shortestPathTree'''
-    '''def getBackwardShortestPathNodes(self, _origin, _destination):
-        shortestPathNodes = _origin
-        currentNode = _origin
-        while currentNode!=_destination:
-            newNode = bm_network.nodeSet[currentNode].getSuccessor()
-            shortestPathNodes = shortestPathNodes + "," + newNode
-            currentNode = newNode
-        return shortestPathNodes'''
-    '''def getBackwardShortestPathLinks(self, _origin, _destination):
-        shortestPathLinks = ""
-        currentNode = bm_network.zoneSet[_origin].getRandomNode()                       #;print currentNode
-        #currentNode = bm_network.zoneSet[_origin].getMinBackwardLabelNode()                       #;print currentNode
-        while currentNode!='':
-            newLink = bm_network.nodeSet[currentNode].getBackwardLink()
-            if newLink==[]:     break
-            if shortestPathLinks == "":
-                shortestPathLinks = newLink
-            else:
-                shortestPathLinks = shortestPathLinks + "," + newLink
-            currentNode = bm_network.nodeSet[currentNode].getSuccessor()
-        return shortestPathLinks[:-1]'''
-####
-    '''def getForwardHyperpath(self, _origin, _destination):
-        hyperpathLinks = ""
-        for tmpNode in bm_network.nodeSet:
-            for tmpLink in bm_network.nodeSet[tmpNode].getForwardHyperlink():
-                if tmpLink=="-": continue
-                if hyperpathLinks=="":
-                    hyperpathLinks = tmpLink
-                else:
-                    hyperpathLinks = hyperpathLinks + "," + tmpLink
-        return hyperpathLinks'''
-####
-    '''def findBackwardHyperpath(self, _destination):
-        'Find path choice set in backward pass'
-        minProb = self.utilityParameters[0]
-        theta = self.utilityParameters[1]
-        diffUtility = (1/theta)*math.log((1-minProb)/minProb)                                                        #;print diffUtility
-        for node in bm_network.nodeSet:
-            bm_network.nodeSet[node].resetLabels()
-        for link in bm_network.linkSet:
-            bm_network.linkSet[link].resetLabels()
-        bm_network.nodeSet[_destination].setBackwardHyperLabel(0,0,'-','-')                                             #;print bm_network.nodeSet[_destination]
-        SE = []
-        heapq.heappush(SE, (bm_network.nodeSet[_destination].getBackwardLabel(), _destination))
-        tmpIter = 0
-        while len(SE)!=0:
-            tmpIter = tmpIter + 1
-            tmpTuple = heapq.heappop(SE)                                                                                #;print tmpTuple
-            currentNode = tmpTuple[1]                                                                                   #;print currentNode
-            currentLabel = bm_network.nodeSet[currentNode].getBackwardLabel()
-            if bm_network.nodeSet[currentNode].isPermanent():   continue
-            else:   bm_network.nodeSet[currentNode].makePermanent()
-            tmpLinkList = bm_network.nodeSet[currentNode].getInboundLinks()                                             #;print tmpLinkList
-            for adjLink in tmpLinkList:
-                if bm_network.linkSet[adjLink].isExcluded(): continue
-                newNode = bm_network.linkSet[adjLink].getFromNode()                                                     #;print "fromNode:", newNode
-                oldLabel = bm_network.nodeSet[newNode].getBackwardLabel()                                               #;print "oldLabel:", oldLabel
-                newCost = currentLabel + bm_network.linkSet[adjLink].getLength()                                        #;print "newCost:", newCost
-                newCost = currentLabel + bm_network.linkSet[adjLink].getCost(self.utilityParameters)                                        #;print "newCost:", newCost
-                newLabel = (-1/theta)*math.log(math.exp(-theta*oldLabel)+math.exp(-theta*newCost))                   #;print "newLabel:", newLabel
-                if not bm_network.nodeSet[currentNode].isSuccessor(newNode): #and newLabel < oldLabel + diffUtility:
-                    bm_network.linkSet[adjLink].exclude()
-                    bm_network.nodeSet[newNode].setBackwardHyperLabel(newLabel, newCost, currentNode, adjLink)
-                    heapq.heappush(SE, (bm_network.nodeSet[newNode].getBackwardLabel(), newNode))
-                    #bm_network.nodeSet[newNode].refineBackwardHyperpath(diffUtility)
-        return tmpIter'''
-    '''def getBackwardHyperpath(self, _origin, _destination):
-        hyperpathLinks = ""
-        for tmpNode in bm_network.nodeSet:
-            for tmpLink in bm_network.nodeSet[tmpNode].getBackwardHyperlink():
-                if tmpLink=="-": continue
-                if hyperpathLinks=="":
-                    hyperpathLinks = tmpLink
-                else:
-                    hyperpathLinks =  tmpLink + ',' + hyperpathLinks
-        return hyperpathLinks'''
-    '''def getBackwardElementaryPath(self, _origin, _destination):
-        minProb = self.utilityParameters[0]
-        theta = self.utilityParameters[1]
-        diffUtility = (-1/theta)*math.log((1-minProb)/minProb)
-        elementaryPath = ""
-        currentNode = _origin
-        while currentNode!=_destination:
-            newAlt = bm_network.nodeSet[currentNode].getBackwardAlternative(theta, minProb)                            #;print newAlt
-            if newAlt==None: continue
-            newNode = newAlt[0]
-            newLink = newAlt[1]
-            if elementaryPath=="":
-                elementaryPath = newLink
-            else:
-                elementaryPath = elementaryPath + ',' + newLink
-            currentNode = newNode
-        return elementaryPath'''

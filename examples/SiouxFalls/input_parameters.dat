@@ -1,6 +1,0 @@
-Value	domain	definition
-2	{1,2}	route choice type (1 for determinisic shortest time path, 2 for stochastic hyperpath)
-2	{1,2,3}	application type (1 for skimming, 2 for assignment/loading, 3 for path evaluation)
-50	positiveInteger	number of path simulation iterations, only applicable to stochastic route choice 
-2	{0,1,2,3}	visulization (0: no visulization, 1: show the network, 2: show the assigned flow, 3 show the path for a selected OD for path evaluation)
-1   {0,1}   print all the paths in the output file
