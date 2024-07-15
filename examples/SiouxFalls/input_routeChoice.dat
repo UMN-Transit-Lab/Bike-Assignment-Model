@@ -1,0 +1,8 @@
+Value:	Parameter
+0.01	:path minimum probability in the stochastic assignment
+0.5	:Theta, the disperssion parameter in the stochastic assignment
+1.00	:Link Length Coefficient
+0.73	:Bike Route Coefficient
+0.84	:Bike Lane Coefficient
+0.61	:Bike Path/Trail Coefficient
+0.75	:Signalized Intersection Coefficient
