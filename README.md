@@ -8,3 +8,5 @@ The code aims to
 Two types of routing algorithms are considered:
 1. Deterministic (shortest in time or distance) routing
 2. Stochastic (hyperpath-based) routing with given route choice parameters
+
+* The MAG2024 branch has been customized to be compatible with MAG models and data. 
