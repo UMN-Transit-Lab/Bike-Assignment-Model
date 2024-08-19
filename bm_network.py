@@ -348,13 +348,14 @@ class Link:
             self.linkId = _token[0] + '.1'
             self.linkFromNode = _token[3]
             self.linkToNode = _token[2]
-        self.linkType = _token[4]
-        self.linkDirection = float(_token[5])
-        self.linkLength = float(_token[6])
-        self.pathType = _token[7]
-        self.surface = _token[8]
-        self.speedLimit = float(_token[9])
-        self.freeFlowTime = float(_token[10])
+        self.facilityType = _token[4]
+        self.areaType = _token[5] 
+        self.linkDirection = float(_token[6])
+        self.linkLength = float(_token[7])
+        self.pathType = _token[8]
+        self.surface = _token[9]
+        self.speedLimit = float(_token[10])
+        self.freeFlowTime = float(_token[11])
 #        self.capacity = float(_token[9])
 #        self.alpha = float(_token[10])
 #        self.beta = float(_token[11])
@@ -368,14 +369,42 @@ class Link:
         self.travelTime = self.freeFlowTime
         Link.linkCount = Link.linkCount + 1
     def calculateSpeedAndTime(self):
-        self.speed = 9.24 ## constant obtained from regression modeling and fixing some variables 
-        self.speed += 0.23*self.linkLength ## speed increase for longer links
+        currentLink = self.linkId
+        actualLinkLength = self.linkLength   ## if links are arbitrarily split, estimate the actual link length based on the degree of the nodes
+        while len(nodeSet[linkSet[currentLink].linkFromNode].inLinks) == 1 and len(nodeSet[linkSet[currentLink].linkFromNode].outLinks) == 1:
+            prevLink = nodeSet[linkSet[currentLink].linkFromNode].inLinks[0]
+            actualLinkLength += linkSet[prevLink].linkLength
+            currentLink = prevLink
+            if actualLinkLength > 10.0:
+                break
+        currentLink = self.linkId
+        while len(nodeSet[linkSet[currentLink].linkToNode].inLinks) == 1 and len(nodeSet[linkSet[currentLink].linkToNode].outLinks) == 1:
+            nextLink = nodeSet[linkSet[currentLink].linkToNode].outLinks[0]
+            actualLinkLength += linkSet[nextLink].linkLength
+            currentLink = nextLink
+            if actualLinkLength > 10.0:
+                break
+
+        self.speed = 9.24 ## constant obtained from regression modeling and fixing some variables
+        self.speed += 0.23*min(0.9999, max(self.linkLength, actualLinkLength)) ## speed increase for longer links, capped at 1 mile
         if self.pathType in ['Bike Lane', 'Multi-Use Path -']: ## assuming off-street, so adding full speed increase 
             self.speed += 0.94 
         elif self.pathType in ['Bike Route', 'Paved Shoulder']:  ## assuming semi-off-street, so adding half speed increase 
             self.speed += (0.94 / 2.0)
         else:  ##assuming on-street and deducting the full speed decrease
             self.speed -= 0.32
+        if self.surface == 'Unsurfaced':
+            self.speed -= 2.0
+            
+        ## Add the effect of Area Type (AT)
+        currentLink = self.linkId
+        if linkSet[currentLink].areaType == 1 or linkSet[currentLink].areaType == 2: ## CBD and outlying CBD
+            self.speed -= 2.0
+        elif linkSet[currentLink].areaType == 3: ## Mixed urban
+            self.speed -= 1.0
+        else:    ## suburban and rural
+            self.speed -= 0
+             
         ## calculate travel time and add the effect of signalized intersection:
         self.freeFlowTime = self.linkLength / self.speed * 60
         if nodeSet[self.linkToNode].nodeType == 3:
@@ -460,7 +489,7 @@ def readLinks(_networkName):
         if tmpIn == "": break
         token = tmpIn.split(',')
         tmpLinkId = token[0]
-        tmpDir = int(token[5])
+        tmpDir = int(token[6])
         if(tmpDir==1):
             ''' Seems like TransCAD direction ID, ''forward'', create a forward link '''
             linkSet[tmpLinkId] = Link(token, '')
