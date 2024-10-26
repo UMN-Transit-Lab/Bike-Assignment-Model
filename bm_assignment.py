@@ -144,9 +144,9 @@ def stochasticForwardAssignment(_filePath, _tod, _numberOfIterations, _printPath
     return endTime - startTime
 '''
 #################################################################################################
-def printAssignmentResults(_filePath, _tod):
+def printLinkFlows(_filePath, _tod):
     outFile = open(_filePath+'output_linkFlows_'+_tod+'.dat', "w")
-    tmpOut = 'LinkID,fromNode,toNode,Direction,Length,Speed,Flow,Time,treverseFlow,reverseTime\n'
+    tmpOut = 'LinkID,FromNode,ToNode,Direction,Length,Speed,Flow,Time,ReverseFlow,ReverseTime\n'
     outFile.write(tmpOut)
     for l in bm_network.linkSet:
         tmpLink = bm_network.linkSet[l]
@@ -171,6 +171,29 @@ def printAssignmentResults(_filePath, _tod):
             outFile.write(tmpOut)
     outFile.close()
 
+def printNodeFlows(_filePath, _tod):
+    outFile = open(_filePath+'output_nodeFlows_'+_tod+'.dat', "w")
+    tmpOut = 'NodeID,Longitude,Latitude,InLinks,OutLinks,InFlow,OutFlow\n'
+    outFile.write(tmpOut)
+    for n in bm_network.nodeSet:
+        tmpNode = bm_network.nodeSet[n]
+        nodeId = tmpNode.nodeId
+        tmpOut = str(nodeId) 
+        tmpOut = tmpOut + ',' + str(tmpNode.nodeLon)
+        tmpOut = tmpOut + ',' + str(tmpNode.nodeLat)
+        tmpOut = tmpOut + ',' + str(len(tmpNode.inLinks))
+        tmpOut = tmpOut + ',' + str(len(tmpNode.outLinks))
+        tmpFlow = 0
+        for l1 in tmpNode.inLinks:
+            tmpFlow += bm_network.linkSet[l1].getFlow()
+        tmpOut = tmpOut + ',' + str(tmpFlow)
+        tmpFlow = 0
+        for l2 in tmpNode.outLinks:
+            tmpFlow += bm_network.linkSet[l2].getFlow()
+        tmpOut = tmpOut + ',' + str(tmpFlow)
+        tmpOut = tmpOut + '\n'
+        outFile.write(tmpOut)
+    outFile.close()
 
 def printPaths(_filePath, _tod):
     pathFinder = bm_path.PathAlgorithm()

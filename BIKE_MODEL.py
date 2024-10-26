@@ -150,8 +150,10 @@ if ASSIGNMENT:
             elif STOCHASTIC_ROUTE_CHOICE:
                 bm_assignment.stochasticForwardAssignment(inputDataLocation, tod, MAX_ITERATIONS, PRINT_PATHS)
                 print ("Assignment was completed.")# Elapsed time =", round(bm_assignment.stochasticForwardAssignment(inputDataLocation, MAX_ITERATIONS, PRINT_PATHS),2), 'seconds') 
-            bm_assignment.printAssignmentResults(inputDataLocation, tod)
+            bm_assignment.printLinkFlows(inputDataLocation, tod)
             print ('Link flows for the time period', tod, 'were printed.') 
+            bm_assignment.printNodeFlows(inputDataLocation, tod)
+            print ('Node flows for the time period', tod, 'were printed.') 
             if SHOW_FLOWS:
                 bike_map = bm_map.createFoliumMap()
                 bike_map.save(inputDataLocation+'Bike_Assignment_Map_'+tod+'.html')
