@@ -20,8 +20,8 @@ import random
 import bm_network
 import bm_path
 
-def readDemand(_filePath, _tod):
-    ''' Reads trip demand for origin-destinations from a text (.dat) file and add them to the '''
+def readDemand(_filePath, _tod, _bike2transit):
+    ''' Reads trip demand for origin-destinations from a text (.csv) file and add them to the '''
     print('---------- READING', _tod, 'DEMAND ----------')
     ## First, reset any existing demand from other time periods
     for tmpZone in bm_network.zoneSet:
@@ -39,7 +39,10 @@ def readDemand(_filePath, _tod):
         token = tmpIn.split(',')
         tmpFromZone = token[0]
         tmpToZone = token[1]
-        tmpDemand = float(token[2+todIndex])
+        if _bike2transit[0]:
+            tmpDemand = float(token[2+4+todIndex])
+        else:
+            tmpDemand = float(token[2+todIndex])
         tmpTotalDemand = tmpTotalDemand + tmpDemand
         if tmpFromZone not in bm_network.zoneSet:
             print ("Zone", tmpFromZone, "is not in 'zoneSet' but has production demand", tmpDemand)
@@ -54,7 +57,7 @@ def readDemand(_filePath, _tod):
 #################################################################################################
 #################################################################################################
 #################################################################################################
-def deterministicForwardAssignment(_filePath, _tod, _numberOfIterations, _printPath):
+def deterministicForwardAssignment(_filePath, _tod, _bike2transit, _numberOfIterations, _printPath):
     print('---------- ASSIGNING', _tod, 'DEMAND ----------')
 
     pathFinder = bm_path.PathAlgorithm()
@@ -68,24 +71,25 @@ def deterministicForwardAssignment(_filePath, _tod, _numberOfIterations, _printP
     for orig in bm_network.zoneSet:
         i=i+1
         if i%100==0: print ("* Assigning the",i,"th row. Time elapsed =", round(time.time()-startTime,2), "seconds.")
-        if bm_network.zoneSet[orig].getTotalTripProduction()<=0:
-            #print ("Zone", orig, "does not have trip production")
-            continue
-        pathFinder.findForwardShortestPath(orig, 0)
-        for dest in bm_network.zoneSet:
-            if orig == dest:
-                continue
-            tmpDemand = bm_network.zoneSet[orig].getTripProduction(dest)
-            if tmpDemand > 0:
-                tmpPath = pathFinder.getForwardShortestPath(orig, dest)
-                if tmpPath[1] != "NA":
-                    for x in tmpPath[1]:
-                        bm_network.linkSet[x].addAuxiliaryFlow(tmpDemand)
-                    if _printPath:
-                        tmpPathLength = sum([bm_network.linkSet[x].linkLength for x in tmpPath[1]])
-                        tmpPathTimeFF = sum([bm_network.linkSet[x].freeFlowTime for x in tmpPath[1]])
-                        bm_network.zoneSet[orig].addPathToTheForwardPathSets(1, dest, tmpPath, tmpPathLength, tmpPathTimeFF)
-        #if i>50: break
+        if bm_network.zoneSet[orig].getTotalTripProduction()>0:
+            pathFinder.findForwardShortestPath(orig, 0)
+            for dest in bm_network.zoneSet:
+                if orig == dest:
+                    continue
+                tmpDemand = bm_network.zoneSet[orig].getTripProduction(dest)
+                if tmpDemand > 0:
+                    tmpPath = pathFinder.getForwardShortestPath(orig, dest)
+                    if tmpPath[1] != "NA":
+                        if _bike2transit[0]: 
+                            tmpPathLength = sum([bm_network.linkSet[x].linkLength for x in tmpPath[1]])
+                            tmpPath = pathFinder.getFirstLastMilePath(tmpPath, tmpPathLength, _bike2transit)
+                        for x in tmpPath[1]:
+                            bm_network.linkSet[x].addAuxiliaryFlow(tmpDemand)
+                        if _printPath:
+                            tmpPathLength = sum([bm_network.linkSet[x].linkLength for x in tmpPath[1]])
+                            tmpPathTimeFF = sum([bm_network.linkSet[x].freeFlowTime for x in tmpPath[1]])
+                            bm_network.zoneSet[orig].addPathToTheForwardPathSets(1, dest, tmpPath, tmpPathLength, tmpPathTimeFF)
+            #if i>50: break
     [bm_network.linkSet[x].updateFlow(1) for x in bm_network.linkSet]
     
     del pathFinder
@@ -144,8 +148,11 @@ def stochasticForwardAssignment(_filePath, _tod, _numberOfIterations, _printPath
     return endTime - startTime
 '''
 #################################################################################################
-def printLinkFlows(_filePath, _tod):
-    outFile = open(_filePath+'output_linkFlows_'+_tod+'.dat', "w")
+def printLinkFlows(_filePath, _tod, _bike2transit):
+    if _bike2transit[0]:
+        outFile = open(_filePath+'output_linkFlows_'+_tod+'_bike2transit.csv', "w")
+    else:
+        outFile = open(_filePath+'output_linkFlows_'+_tod+'.csv', "w")
     tmpOut = 'LinkID,FromNode,ToNode,Direction,Length,Speed,Flow,Time,ReverseFlow,ReverseTime\n'
     outFile.write(tmpOut)
     for l in bm_network.linkSet:
@@ -171,8 +178,11 @@ def printLinkFlows(_filePath, _tod):
             outFile.write(tmpOut)
     outFile.close()
 
-def printNodeFlows(_filePath, _tod):
-    outFile = open(_filePath+'output_nodeFlows_'+_tod+'.dat', "w")
+def printNodeFlows(_filePath, _tod, _bike2transit):
+    if _bike2transit[0]:
+        outFile = open(_filePath+'output_nodeFlows_'+_tod+'_bike2transit.csv', "w")
+    else:
+        outFile = open(_filePath+'output_nodeFlows_'+_tod+'.csv', "w")
     tmpOut = 'NodeID,Longitude,Latitude,InLinks,OutLinks,InFlow,OutFlow\n'
     outFile.write(tmpOut)
     for n in bm_network.nodeSet:
@@ -195,13 +205,16 @@ def printNodeFlows(_filePath, _tod):
         outFile.write(tmpOut)
     outFile.close()
 
-def printPaths(_filePath, _tod):
+def printPaths(_filePath, _tod, _bike2transit):
     pathFinder = bm_path.PathAlgorithm()
     pathFinder.readUtilityParameters(_filePath)
     startTime = time.time()
     i = 0
 
-    tmpOutFile = open(_filePath+'output_paths_'+_tod+'.dat', "w")
+    if _bike2transit[0]:
+        tmpOutFile = open(_filePath+'output_paths_'+_tod+'.csv', "w")
+    else:
+        tmpOutFile = open(_filePath+'output_paths_'+_tod+'_bike2transit.csv', "w")
     #tmpOutFile.write("Origin\tDestination\tPathNumber\tProbability\tPathLength\tPathFreeFlowTime\tPathNodes\tPathLinks\n" )
     tmpOutFile.write("Origin\tDestination\tPathNumber\tProbability\tPathLength\tPathFreeFlowTime\tPathLinks\n" )
 

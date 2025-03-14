@@ -24,9 +24,9 @@ inputDataLocation = "Bike Model IO/"
 ################################################## Reading Input Parameters ##################################################
 ''' Read the Input Parameters ''' 
 try:
-    inFile = open(inputDataLocation+"input_parameters.dat", "r")
+    inFile = open(inputDataLocation+"input_parameters.txt", "r")
 except: 
-    print('Unable to read input_parameters.dat file. Program is terminating.')
+    print('Unable to read input_parameters.txt file. Program is terminating.')
 tmpIn = inFile.readline()
 tmpParameters = []
 while (1):
@@ -127,6 +127,24 @@ if ASSIGNMENT:
         ASSIGNMENT_PERIODS['NT'] = 0
         print ("Parameter for assignment time period NT is out of range {0,1}. Time period will be excluded from assignment.")
 
+BIKE_TO_TRANSIT = False
+if ASSIGNMENT:
+    if int(tmpParameters[9]) == 0:
+        BIKE_TO_TRANSIT = [False]
+    elif int(tmpParameters[9]) == 1:
+        BIKE_TO_TRANSIT = [True]
+    else:
+        print ("Parameter for Bike-to-Transit is out of range {0,1}. Trips will be assigned as bike-only.")
+    
+    if BIKE_TO_TRANSIT:
+        MIN_BIKE_TO_TRANSIT_DIST = min(0.5, max(0.2, float(tmpParameters[10]))) 
+        MAX_BIKE_TO_TRANSIT_DIST = min(2.0, max(0.5, float(tmpParameters[11])))
+        if MIN_BIKE_TO_TRANSIT_DIST < MAX_BIKE_TO_TRANSIT_DIST:
+            BIKE_TO_TRANSIT.append(MIN_BIKE_TO_TRANSIT_DIST)
+            BIKE_TO_TRANSIT.append(MAX_BIKE_TO_TRANSIT_DIST)
+        else:
+            print ("Bike-to-tranit distances are not valid. Default values (0.25, 0.75) will be used.")
+            BIKE_TO_TRANSIT.append(0.25, 0.75)
 print ('----------------------------------------')
 
 ################################################## Reading Input Data ##################################################
@@ -143,23 +161,26 @@ time.sleep(1)
 if ASSIGNMENT:    
     for tod in ASSIGNMENT_PERIODS:
         if ASSIGNMENT_PERIODS[tod] == 1:
-            print ('Number of', tod, 'Trips: ', bm_assignment.readDemand(inputDataLocation, tod))
+            print ('Number of', tod, 'Trips: ', bm_assignment.readDemand(inputDataLocation, tod, BIKE_TO_TRANSIT))
             if DETERMINISTIC_ROUTE_CHOICE:
-                bm_assignment.deterministicForwardAssignment(inputDataLocation, tod, MAX_ITERATIONS, PRINT_PATHS)
+                bm_assignment.deterministicForwardAssignment(inputDataLocation, tod, BIKE_TO_TRANSIT, MAX_ITERATIONS, PRINT_PATHS)
                 print ("Assignment was completed.")# Elapsed time =", round(bm_assignment.deterministicForwardAssignment(inputDataLocation, MAX_ITERATIONS, PRINT_PATHS),2), 'seconds')
             elif STOCHASTIC_ROUTE_CHOICE:
                 bm_assignment.stochasticForwardAssignment(inputDataLocation, tod, MAX_ITERATIONS, PRINT_PATHS)
                 print ("Assignment was completed.")# Elapsed time =", round(bm_assignment.stochasticForwardAssignment(inputDataLocation, MAX_ITERATIONS, PRINT_PATHS),2), 'seconds') 
-            bm_assignment.printLinkFlows(inputDataLocation, tod)
+            bm_assignment.printLinkFlows(inputDataLocation, tod, BIKE_TO_TRANSIT)
             print ('Link flows for the time period', tod, 'were printed.') 
-            bm_assignment.printNodeFlows(inputDataLocation, tod)
+            bm_assignment.printNodeFlows(inputDataLocation, tod, BIKE_TO_TRANSIT)
             print ('Node flows for the time period', tod, 'were printed.') 
             if SHOW_FLOWS:
                 bike_map = bm_map.createFoliumMap()
-                bike_map.save(inputDataLocation+'Bike_Assignment_Map_'+tod+'.html')
+                if BIKE_TO_TRANSIT[0]:
+                    bike_map.save(inputDataLocation+'Bike_Assignment_Map_'+tod+'_bike2transit.html')
+                else:
+                    bike_map.save(inputDataLocation+'Bike_Assignment_Map_'+tod+'.html')
                 print ('Link flows for the time period', tod, 'were plotted on the map.')
             if PRINT_PATHS:
-                bm_assignment.printPaths(inputDataLocation, tod)
+                bm_assignment.printPaths(inputDataLocation, tod, BIKE_TO_TRANSIT)
                 print ("Path flows were printed.")
             print ('----------------------------------------')
             time.sleep(1)

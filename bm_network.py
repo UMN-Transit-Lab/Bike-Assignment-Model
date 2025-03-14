@@ -466,7 +466,7 @@ class Link:
     
 ################################################## Reading Input Data ##################################################
 def readNodes(_networkName):
-    ''' Reads nodes from a text (.dat) file and creates Node objects '''
+    ''' Reads nodes from a text (.csv) file and creates Node objects '''
     inFile = open(_networkName+"input_nodes.csv", "r")
     tmpIn = inFile.readline()
     while (1):
@@ -481,7 +481,7 @@ def readNodes(_networkName):
     return len(nodeSet) #bm_network.Node.nodeCount
 
 def readLinks(_networkName):
-    ''' Reads links from a text (.dat) file and creates Link objects '''
+    ''' Reads links from a text (.csv) file and creates Link objects '''
     inFile = open(_networkName+"input_links.csv", "r")
     tmpIn = inFile.readline()
     while (1):
@@ -539,7 +539,7 @@ def refineNodes():
     return len(nodeSet) #bm_network.Node.nodeCount
 
 def readZones(_networkName):
-    ''' Reads zones (connedtors?) from a text (.dat) file and creates Zone objects '''
+    ''' Reads zones (connedtors?) from a text (.csv) file and creates Zone objects '''
     inFile = open(_networkName+"input_zones.csv", "r")
     tmpIn = inFile.readline()
     #i = 1

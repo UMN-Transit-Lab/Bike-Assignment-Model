@@ -30,7 +30,7 @@ class PathAlgorithm:
         for node in bm_network.nodeSet:
             bm_network.nodeSet[node].getForwardLabel()
     def readUtilityParameters(self, _filePath):
-        inFile = open(_filePath+"input_routeChoice.dat", "r")
+        inFile = open(_filePath+"input_routeChoice.txt", "r")
         self.utilityParameters = []
         tmpIn = inFile.readline()
         while (1):
@@ -80,7 +80,7 @@ class PathAlgorithm:
         shortestPathLinks = []
         while currentNode!=_origin:
             newLink = bm_network.nodeSet[currentNode].getForwardLink()
-            if newLink=='':
+            if (newLink=='' or newLink==[]):
                 break
             newNode = bm_network.linkSet[newLink].linkFromNode
             shortestPathLinks.insert(0, newLink)
@@ -93,7 +93,31 @@ class PathAlgorithm:
             #currentNode = bm_network.nodeSet[currentNode].getPredecessor()
             currentNode = newNode
         return [shortestPathNodes, shortestPathLinks]
+    def getFirstLastMilePath(self, _path, _pathLength, _bike2transitParameters):
+        #tmpAccessLength = max(0.5,_pathLength/4.0)
+        #tmpAccessLength = max(1.0, min(0.25,_pathLength/5.0) )
+        tmpAccessLength = min(_bike2transitParameters[2], max(_bike2transitParameters[1],_pathLength/5.0) )
+        tmpLength = 0
+        tmpAccessLinks = []
+        for _link in _path[1]:
+            tmpLength += bm_network.linkSet[_link].linkLength
+            if tmpLength <= tmpAccessLength:
+                tmpAccessLinks.append(_link)
+            else:
+                break
+        tmpLength = 0
+        tmpEgressLinks = []
+        for _link in reversed(_path[1]):
+            tmpLength += bm_network.linkSet[_link].linkLength
+            if tmpLength <= tmpAccessLength:
+                tmpEgressLinks.insert(0,_link)
+            else:
+                break
+        tmpFistLastMileLinks = tmpAccessLinks + tmpEgressLinks
+        return [0, tmpFistLastMileLinks]
+        
 ################################################## Hyperpaths ##################################################
+    '''
     def findForwardHyperpath(self, _origin, _skim):
         'Find path choice set in forward pass'
         minProb = self.utilityParameters[0]
@@ -144,7 +168,8 @@ class PathAlgorithm:
                     #for tmpRemovedLink in tmpRemovedLinks:
                     #    bm_network.linkSet[tmpRemovedLink].resetLabels()
         return tmpIter
-    def getForwardElementaryPath(self, _origin, _destination):
+    '''
+    '''    def getForwardElementaryPath(self, _origin, _destination):
         minProb = self.utilityParameters[0]
         theta = self.utilityParameters[1]
         diffUtility = (-1/theta)*math.log((1-minProb)/minProb)
@@ -165,11 +190,11 @@ class PathAlgorithm:
                         #time.sleep(1)
                         #if newAlt[0]!=prevNode:
                         if newAlt[0] not in elementaryPathNodes:
-                            ''' This means that a next node it found that is not already in the path (i.e., it doesn't create a loop).
-                            Therefore, exit the while loop and proceed. '''
+                            ## This means that a next node it found that is not already in the path (i.e., it doesn't create a loop).
+                            Therefore, exit the while loop and proceed. 
                             break
                         else:
-                            ''' The node already in the path, so creates a loop. Void it and go to next j to select another node probabilisitically.'''
+                            ## The node already in the path, so creates a loop. Void it and go to next j to select another node probabilisitically.
                             newAlt = None
                 j=j+1
 
@@ -191,7 +216,7 @@ class PathAlgorithm:
                 currentNode = newNode
 #        return [elementaryPathNodes, elementaryPathLinks]    ### This is the complete one before using Zones in MAG 2024 work
         return [elementaryPathNodes[1:], elementaryPathLinks[1:]]
-    
+    '''    
 ################################################## Other Path Functions ##################################################
     def getPathCost(self, _path):
         pathCost = 0
